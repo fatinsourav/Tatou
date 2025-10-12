@@ -8,7 +8,7 @@ The following instructions are meant for a bash terminal on a Linux machine. If 
 To clone the repo, you can simply run:
 
 ```bash
-git clone https://github.com/sandywid/group03
+git clone https://github.com/fatinsourav/Tatou
 ```
 
 Note that you should probably fork the repo and clone your own repo.
