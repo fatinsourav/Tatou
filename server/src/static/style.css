@@ -1,0 +1,237 @@
+    :root {
+      --bg: #0f172a;        /* slate-900 */
+      --panel: #111827;     /* gray-900 */
+      --muted: #94a3b8;     /* slate-400 */
+      --text: #e5e7eb;      /* gray-200 */
+      --brand: #4f46e5;     /* indigo-600 */
+      --brand-600: #4338ca;
+      --ring: 0 0 0 3px rgba(79,70,229,.35);
+      --radius: 16px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #f8fafc; --panel:#ffffff; --text:#0f172a; --muted:#475569; }
+      header { box-shadow: 0 1px 0 rgba(2,6,23,.06); }
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(99,102,241,.18), transparent 60%),
+                  radial-gradient(900px 500px at 110% 10%, rgba(16,185,129,.12), transparent 60%), var(--bg);
+      color: var(--text);
+      display: flex; flex-direction: column;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(1100px, 92%); margin: 0 auto; }
+
+    /* Header */
+    header { position: sticky; top: 0; backdrop-filter: saturate(150%) blur(6px); background: color-mix(in oklab, var(--bg) 86%, transparent); z-index: 10; }
+    .nav { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .2px; }
+    .brand__dot { width: 10px; height: 10px; border-radius: 999px; background: linear-gradient(135deg, var(--brand), #10b981); box-shadow: 0 0 14px rgba(79,70,229,.55); }
+    .nav__links { display: flex; align-items: center; gap: 12px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(148,163,184,.18); background: color-mix(in oklab, var(--panel) 86%, transparent); color: var(--text); font-weight: 600; }
+    .btn:hover { border-color: rgba(148,163,184,.4); transform: translateY(-1px); transition: .15s ease; }
+    .btn--primary { background: var(--brand); border-color: var(--brand); }
+    .btn--primary:hover { background: var(--brand-600); box-shadow: var(--ring); }
+
+    /* Hero */
+    .hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 28px; align-items: center; padding: 64px 0 40px; }
+    .hero h1 { font-size: clamp(28px, 4vw, 48px); line-height: 1.08; margin: 0 0 12px; letter-spacing: -.3px; }
+    .hero p { color: var(--muted); font-size: clamp(14px, 1.8vw, 18px); margin: 0 0 22px; }
+    .hero__cta { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    .card {
+      background: color-mix(in oklab, var(--panel) 86%, transparent);
+      border: 1px solid rgba(148,163,184,.15);
+      padding: 18px;
+      border-radius: var(--radius);
+    }
+
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .feature h3 { margin: 8px 0 6px; font-size: 16px; }
+    .feature p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    /* Footer */
+    footer { padding: 36px 0; color: var(--muted); font-size: 14px; }
+
+    /* Responsive */
+    @media (max-width: 860px) {
+      .hero { grid-template-columns: 1fr; padding-top: 40px; }
+      .features { grid-template-columns: 1fr; }
+    }
+    
+    /* Forms */
+.form-vertical { display:block; width:100%; }
+.form-vertical label { display:block; font-size:14px; font-weight:500; margin:10px 0 4px; }
+.form-vertical input, form select, form textarea { width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-size:14px; }
+.form-vertical input:focus, form select:focus, form textarea:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 2px rgba(79,70,229,0.25); }
+.form-vertical button { margin-top:12px; }
+
+
+/* Utility for grouping inputs */
+.form-grid { display:flex; flex-direction:column; gap:12px; }
+
+/* added a new design /Sandra */
+
+:root{
+  --bg: #ede7dd;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --muted: #6b7280;
+
+  --primary: #9f801a;   /* guld/brun */
+  --primary-contrast: #ffffff;
+
+  --danger-bg: #fef2f2;
+  --danger-border: #fca5a5;
+  --danger-text: #b91c1c;
+
+  --btn-bg: #f9fafb;
+  --btn-bg-hover: #f3f4f6;
+  --btn-border: #e5e7eb;
+  --btn-border-hover: #d1d5db;
+}
+
+/* Bakgrund (platt, utan gradienter) */
+html, body {
+  background: var(--bg) !important;
+  background-image: none !important;
+}
+body::before, body::after { content: none !important; }
+
+/* Layout helpers (om inte redan finns) */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+
+/* Header – lätt frostad */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255,255,255,.8);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.nav { display:flex; align-items:center; justify-content:space-between; padding:12px 0; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  transition: background .2s, border-color .2s, opacity .2s;
+  text-decoration: none;
+}
+.btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-border-hover); }
+.btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-contrast);
+}
+.btn--primary:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  opacity: .95;
+}
+.btn--ghost {
+  background: #fff;
+  border-color: var(--border);
+  color: #374151;
+}
+.btn--danger {
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.btn--danger:hover { background: #fee2e2; border-color: #f87171; }
+.btn--block { width: 100%; } /* For the delete document button /Sandra */
+
+.btn--lg {
+  padding: 10px 18px;
+  font-size: 15px;
+} /* For the log in button /Sandra */
+
+/* Tabell */
+.table-wrap { overflow:auto; }
+.table { width:100%; border-collapse: collapse; }
+.table thead th { text-align:left; font-weight:600; padding:10px 8px; border-bottom:1px solid var(--border); }
+.table tbody tr { border-bottom: 1px solid var(--border); }
+.table tbody tr:last-child { border-bottom: none; }
+.table td { padding: 12px 8px; vertical-align: middle; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+.small { font-size: 12px; }
+.muted { color: var(--muted); }
+
+/* Radåtgärder i grid */
+.row-actions--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, auto));
+  gap: 8px;
+  align-items: center;
+}
+
+/* Gör delete-knappen helbredd längst ner */
+.row-actions__delete {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+}
+
+/* Versions-knappen ska inte ta hel rad */
+.row-actions__inline {
+  grid-column: auto;
+}
+
+/* Modal (om du använder .modal/.modal__card) */
+.modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.25); padding: 16px; }
+.modal__card { max-width: 720px; width: 100%; }
+.pre { white-space: pre-wrap; word-break: break-word; }
+
+/* Respektera hidden på modalen */
+.modal[hidden] {
+  display: none !important;
+}
+
+/* Visa/Dölj-lösenordsknapp */
+.pw-toggle {
+  background-color: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.pw-toggle:hover { background-color: #D4AF37; }
+
+/* Formfält – ersätter inline-stilar i login/signup */
+.input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  outline: none;
+}
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(159,128,26,.15); }
+
+/* Auth-kort – ersätter inline max-width/margins */
+.card--auth { max-width: 420px; margin: 40px auto; }
+
+/* Hjälte/hero (index) – valfritt, men bibehåller tema */
+.hero { display:grid; grid-template-columns: 1.1fr .9fr; gap: 20px; align-items: center; padding: 24px 0; }
+.hero__cta { display:flex; gap:10px; flex-wrap:wrap; }
+
+/* Små util-klasser */
+.list { list-style:none; padding:0; margin:0; }
+.list-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.brand { display:inline-flex; align-items:center; gap:8px; text-decoration:none; color:inherit; }
+.brand__dot { width:10px; height:10px; border-radius:999px; display:inline-block; background: var(--primary); }
+
