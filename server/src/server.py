@@ -1128,6 +1128,7 @@ def create_app():
         now = datetime.utcnow()
         return (root / f"{now:%Y}" / f"{now:%m}" / str(document_id) / f"{link_hex}.pdf")
 
+    # Replace the entire function with:
     def _create_rmap_watermarked_pdf(link_secret: str, identity: str | None = None) -> str:
         if not BASE_PDF.exists():
             raise RuntimeError(f"Missing original PDF: {BASE_PDF}")
@@ -1136,40 +1137,23 @@ def create_app():
         out_path = _version_output_path(doc_id, link_secret)
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # --- försök bästa metod ---
+    # Use FatinWM instead
         try:
-            from PDFishAndChipsStamp import PDFishAndChipsStamp
-            wm = PDFishAndChipsStamp()
+            from fatinWM import FatinWM
+            wm = FatinWM()
             secret_payload = (identity.strip() if isinstance(identity, str) and identity.strip() else str(link_secret))
             watermarked_bytes = wm.add_watermark(
                 pdf=str(BASE_PDF),
                 secret=secret_payload,
-                key="rmap_session_key_2025", #I know it should not be here but i got too angry cause it dit not work to move it :) /Sandra
+                key="rmap_session_key_2025",
                 position=None,
-            )
-
-
+        )
             out_path.write_bytes(watermarked_bytes)
             return str(out_path)
         except Exception:
-            pass
-
-        # --- fallback 1 ---
-        try:
-            from add_stamp import add_stamp
-            watermarked_bytes = add_stamp(
-                pdf=str(BASE_PDF),
-                secret=str(link_secret),
-                position=None,
-            )
-            out_path.write_bytes(watermarked_bytes)
+        # Fallback: copy original
+            out_path.write_bytes(Path(BASE_PDF).read_bytes())
             return str(out_path)
-        except Exception:
-            pass
-
-        # --- sista fallback: kopiera originalet ---
-        out_path.write_bytes(Path(BASE_PDF).read_bytes())
-        return str(out_path)
 
 
     def _store_rmap_version(link_hex: str, path: str) -> None:
