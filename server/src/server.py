@@ -241,7 +241,7 @@ def create_app():
 
     #shared limit for upload (per user/IP)/Sandra
     upload_limit = limiter.shared_limit(
-        "2 per minute; 20 per hour",
+        "10 per minute; 100 per hour",  # Increased limits
         scope="upload",
         key_func=user_or_ip
     )
@@ -351,9 +351,9 @@ def create_app():
             with get_engine().begin() as conn:
             # Check if username or email already exists for better error messages
                 existing = conn.execute(
-                    text("SELECT login, email FROM Users WHERE login = :login OR email = :email"),
-                    {"login": login, "email": email}
-            ).first()
+                text("SELECT login, email FROM Users WHERE login = :login OR email = :email"),
+                {"login": login, "email": email}
+                ).first()
             
                 if existing:
                     if existing.login == login:
@@ -414,7 +414,7 @@ def create_app():
     # POST /api/upload-document  (multipart/form-data)
     @app.post("/api/upload-document")
     @require_auth
-    @upload_limit #added this for brute-force 
+
     def upload_document():
         if "file" not in request.files:
             return jsonify({"error": "file is required (multipart/form-data)"}), 400
