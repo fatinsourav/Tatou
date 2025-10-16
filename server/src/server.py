@@ -104,17 +104,21 @@ SERVER_PUB = os.path.join(KEYS_DIR, "server_pub.asc")
 SERVER_PRIV = os.path.join(KEYS_DIR, "server_priv.asc")
 
 
-# Fils/PDF /Sandra
+# Files/PDF /
 STATIC_DIR = Path(BASE_DIR) / "static"
-BASE_PDF = STATIC_DIR / "Group_3.pdf"  
+BASE_PDF = STATIC_DIR / "Group_3.pdf"
+VERSIONS_DIR = Path(BASE_DIR) / "storage" / "versions"  # ADD THIS LINE 
 
 
 def init_rmap():
-    """Initiera RMAP with right key paths."""
+    """Initialize RMAP with right key paths and passphrase."""
+    passphrase = os.environ.get("SERVER_PRIV_PASSPHRASE", "fatinsiratsourav")
+    
     id_manager = IdentityManager(
-        CLIENT_KEYS_DIR,  # clients public keys (clients/*.asc) /Sandra 
-        SERVER_PUB,       # serverns public keys /Sandra
-        SERVER_PRIV,       # serverns private key /Sandra
+        CLIENT_KEYS_DIR,  # clients public keys (clients/*.asc)
+        SERVER_PUB,       # server's public key
+        SERVER_PRIV,      # server's private key
+        passphrase        # ADD THIS: passphrase for private key
     )
     return RMAP(id_manager)
 
@@ -142,7 +146,7 @@ def _watermark_and_save(secret: str) -> str:
 
     return str(out_path)
 
-#added for end of phase oen update so that they will get a DocumentID / Sandra
+#added for end of phase oen update so that they will get a DocumentID / 
 
 def _file_sha256_hex(p: Path) -> str:
     h = hashlib.sha256()
@@ -184,12 +188,12 @@ def _ensure_document_for_path(path_str: str, owner_id: int = 1) -> int:
 
 def create_app():
     app = Flask(__name__)
-    #added for end of phase one /Sandra
+    # After phase I
     global rmap
     if rmap is None:
         rmap = init_rmap()
 
-#Added for logs /Sandra 
+
     # enkel JSON-logger till stdout (docker log driver fångar detta)
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(jsonlogger.JsonFormatter())
@@ -218,30 +222,30 @@ def create_app():
         return response
 
 
-#added this to prevent eg. brute-force - baseline for the whole app/Sandra
+
     limiter = Limiter(
         key_func=get_remote_address,  # per-IP as standard
         app=app,
         default_limits=["200 per day", "50 per hour"]  # baseline for all endpoints
     )
 
-    # key function: per log-in, if not logged-in its per IP/Sandra
+    # key function: per log-in, if not logged-in its per IP/
     def user_or_ip():
         try:
             return f"user:{int(g.user['id'])}"
         except Exception:
             return f"ip:{get_remote_address()}"
 
-    #key for each account at log-in (fallback to IP)/Sandra
+    #key for each account at log-in (fallback to IP)
     def login_key():
         body = request.get_json(silent=True) or {}
         login = (body.get("login") or body.get("email") or "").strip().lower()
         return f"acct:{login}" if login else f"ip:{get_remote_address()}"
 
 
-    #shared limit for upload (per user/IP)/Sandra
+    #shared limit for upload (per user/IP)
     upload_limit = limiter.shared_limit(
-        "2 per minute; 20 per hour",
+        "10 per minute; 100 per hour",  # Increased limits
         scope="upload",
         key_func=user_or_ip
     )
@@ -249,7 +253,7 @@ def create_app():
 
 
     # --- Config ---
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "changed-it-a-little-in-case-of-that-the-env-does-not-work") #changed hahah/Sandra
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "changed-it-a-little-in-case-of-that-the-env-does-not-work") #changed hahah
     app.config["STORAGE_DIR"] = Path(os.environ.get("STORAGE_DIR", "./storage")).resolve()
     app.config["TOKEN_TTL_SECONDS"] = int(os.environ.get("TOKEN_TTL_SECONDS", "86400"))
 
@@ -351,9 +355,9 @@ def create_app():
             with get_engine().begin() as conn:
             # Check if username or email already exists for better error messages
                 existing = conn.execute(
-                    text("SELECT login, email FROM Users WHERE login = :login OR email = :email"),
-                    {"login": login, "email": email}
-            ).first()
+                text("SELECT login, email FROM Users WHERE login = :login OR email = :email"),
+                {"login": login, "email": email}
+                ).first()
             
                 if existing:
                     if existing.login == login:
@@ -414,7 +418,7 @@ def create_app():
     # POST /api/upload-document  (multipart/form-data)
     @app.post("/api/upload-document")
     @require_auth
-    @upload_limit #added this for brute-force 
+
     def upload_document():
         if "file" not in request.files:
             return jsonify({"error": "file is required (multipart/form-data)"}), 400
@@ -787,7 +791,7 @@ def create_app():
             return jsonify({"error": "document id required"}), 400
             
         payload = request.get_json(silent=True) or {}
-        # allow a couple of aliases for convenience /Sandra
+        # allow a couple of aliases for convenience 
         method = payload.get("method")
         intended_for = payload.get("intended_for")
         position = payload.get("position") or None
@@ -802,7 +806,7 @@ def create_app():
         if not method or not intended_for or not isinstance(secret, str) or not isinstance(key, str):
             return jsonify({"error": "method, intended_for, secret, and key are required"}), 400
 
-        # lookup the document; enforced ownership /Sandra
+        # lookup the document; enforced ownership 
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
@@ -876,7 +880,7 @@ def create_app():
         except Exception as e:
             return jsonify({"error": f"failed to write watermarked file: {e}"}), 500
 
-        # link token = random hash instead of SHA1 / Sandra 
+        # link token = random hash instead of SHA1 
         link_token = secrets.token_urlsafe(24)
 
         try:
@@ -971,7 +975,7 @@ def create_app():
         if not is_ok:
             return jsonify({"error": "plugin does not implement WatermarkingMethod API (add_watermark/read_secret)"}), 400
             
-        # Register the class (not an instance) /Sandra
+        # Register the class (not an instance) 
         WMUtils.METHODS[method_name] = cls()
         
         return jsonify({
@@ -999,7 +1003,7 @@ def create_app():
     @app.post("/api/read-watermark/<int:document_id>")
     @require_auth
     def read_watermark(document_id: int | None = None):
-    # Get document-ID from path, query (?id=/ ?documentid=) or body /Sandra
+    # Get document-ID from path, query (?id=/ ?documentid=) or body 
         if not document_id:
             document_id = (
                 request.args.get("id")
@@ -1015,14 +1019,14 @@ def create_app():
         method   = payload.get("method")
         key      = payload.get("key")
         position = payload.get("position") or None
-        link     = payload.get("link") # NEW: Support to read through the link/Sandra
-        version_id = payload.get("version_id") or payload.get("versionId")  #so they only need a key/Sandra
+        link     = payload.get("link") # NEW: Support to read through the link
+        version_id = payload.get("version_id") or payload.get("versionId")  #so they only need a key
 
     # CHANGED /Sandra
         if not isinstance(key, str):
-            return jsonify({"error": "key is required"}), 400 #Added/Sandnra
+            return jsonify({"error": "key is required"}), 400 #Added/
 
-        storage_root = Path(app.config["STORAGE_DIR"]).resolve()  # MOVED/Sandrsa
+        storage_root = Path(app.config["STORAGE_DIR"]).resolve()  # MOVED
 
 #I changed this so they only need the key and not method /Sandra
         try:
@@ -1186,7 +1190,7 @@ def create_app():
 
 
     # --- /rmap-initiate: pass-through av base64 till RMAP, returnera RMAP:s base64 ---
-    @app.route("/rmap-initiate", methods=["POST"])
+    @app.route("/api/rmap-initiate", methods=["POST"])
     def rmap_initiate():
         incoming = request.get_json(force=True, silent=True) or {}
         b64 = (incoming.get("payload") or "").strip()
@@ -1212,7 +1216,7 @@ def create_app():
 
 
     # --- /rmap-get-link: pass-through av base64 till RMAP, bygg 32-hex av noncerna ---
-    @app.route("/rmap-get-link", methods=["POST"])
+    @app.route("/api/rmap-get-link", methods=["POST"])
     def rmap_get_link():
         incoming = request.get_json(force=True, silent=True) or {}
         b64 = (incoming.get("payload") or "").strip()
