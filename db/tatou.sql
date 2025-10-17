@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS `Users` (
   `hpassword` VARCHAR(255) NOT NULL,           -- password hash (argon2/bcrypt/etc)
   `login` VARCHAR(64) NOT NULL,                -- username/handle
   PRIMARY KEY (`id`),                                   
-  UNIQUE KEY `uq_users_email` (`email`)        -- email unique   
+  UNIQUE KEY `uq_users_email` (`email`),       -- email unique   
   UNIQUE KEY `uq_users_login` (`login`)        -- username unique
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS `Versions` (
   `intended_for` VARCHAR(320) NULL,            -- optional email/name
   `secret` VARCHAR(320) NOT NULL,              -- secret
   `method` VARCHAR(32) NOT NULL,               -- e.g., "text_overlay"
-  `position` TEXT,               -- e.g., "text_overlay"
-  `path` VARCHAR(320) NOT NULL,              -- secret
+  `position` TEXT,                             -- optional position info
+  `path` VARCHAR(320) NOT NULL,                -- file path
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_Versions_link` (`link`),
   KEY `ix_Versions_documentid` (`documentid`),
@@ -54,4 +54,3 @@ CREATE TABLE IF NOT EXISTS `Versions` (
     FOREIGN KEY (`documentid`) REFERENCES `Documents`(`id`)
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
