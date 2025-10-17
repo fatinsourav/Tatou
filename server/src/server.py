@@ -106,7 +106,7 @@ SERVER_PRIV = os.path.join(KEYS_DIR, "server_priv.asc")
 
 # Files/PDF /
 STATIC_DIR = Path(BASE_DIR) / "static"
-BASE_PDF = STATIC_DIR / "Group_3.pdf"
+BASE_PDF = STATIC_DIR / "Group_1.pdf"
 VERSIONS_DIR = Path(BASE_DIR) / "storage" / "versions"  # ADD THIS LINE 
 
 
