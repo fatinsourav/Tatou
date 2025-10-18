@@ -1,0 +1,16 @@
+PyMuPDF>=1.21.1
+Flask==3.0.3
+gunicorn==21.2.0
+PyMySQL==1.1.2
+SQLAlchemy==2.0.43
+dill==0.4.0
+rmap@ git+https://github.com/nharrand/RMAP-Server.git@v1.0.0
+Flask-Limiter>=3.0.0
+cryptography>=41.0.0
+pikepdf<11,>=8
+pypdf>=4.0.0
+cryptography>=42.0.0
+python-json-logger==2.0.7
+
+[dev]
+pytest>=7.0.0
