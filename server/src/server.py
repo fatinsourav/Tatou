@@ -8,15 +8,15 @@ import datetime as dt
 from pathlib import Path
 from functools import wraps
 
-import base64 #added for end of pahse /Sandra
-import binascii #added for end of pahse /Sandra
+import base64 #added for end of pahse / 
+import binascii #added for end of pahse /
 
 from flask import Flask, jsonify, request, g, send_file
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
-#added for loggning /Sandra
+#added for loggning /
 from flag_detection import detect_flag_attempt
 import logging, sys, json
 try:
@@ -31,27 +31,27 @@ os.makedirs(os.path.dirname(log_path), exist_ok=True)
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 
-# --- 1. Log to stdout (can be seen in docker logs) /Sandra
+# --- 1. Log to stdout (can be seen in docker logs) 
 stream_handler = logging.StreamHandler(sys.stdout)
 stream_handler.setFormatter(formatter)
 root_logger.addHandler(stream_handler)
 
-# --- 2. Log to file (can be seen in group03/logs/app.log) /Sandra
+
 file_handler = logging.FileHandler(log_path)
 file_handler.setFormatter(formatter)
 root_logger.addHandler(file_handler)
 
-# Testlog when starting /Sandra
+# Testlog when starting
 logging.getLogger(__name__).info({"event": "startup", "message": "Logger initialized", "log_path": log_path})
 
-#added this to include rate limiting, to prevent eg. brute-force attacks /Sandra
+#added this to include rate limiting, to prevent eg. brute-force attacks 
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
-#added this for end of phase update/Sandra 
+#added this for end of phase update
 import shutil
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, url_for
@@ -63,23 +63,23 @@ from flask import current_app
 from sqlalchemy import text, create_engine
 from datetime import datetime
 
-# end of phase one / Sandra
+# end of phase one / 
 def _db_url_from_cfg(cfg) -> str:
     return (
         f"mysql+pymysql://{cfg['DB_USER']}:{cfg['DB_PASSWORD']}"
         f"@{cfg['DB_HOST']}:{cfg['DB_PORT']}/{cfg['DB_NAME']}?charset=utf8mb4"
     )
 
-# end of phase one / Sandra
+# end of phase one 
 def get_engine():
-    app = current_app  # using the active Flask-app /Sandra
+    app = current_app  # using the active Flask-app 
     eng = app.config.get("_ENGINE")
     if eng is None:
         eng = create_engine(_db_url_from_cfg(app.config), pool_pre_ping=True, future=True)
         app.config["_ENGINE"] = eng
     return eng
 
-# end of phase one / Sandra
+# end of phase one /
 from rmap.identity_manager import IdentityManager
 from rmap.rmap import RMAP
 
@@ -89,7 +89,7 @@ try:
 except Exception:  # dill is optional
     _pickle = _std_pickle
 
-rmap = None # /Sandra
+rmap = None # /
 
 import watermarking_utils as WMUtils
 from watermarking_method import WatermarkingMethod
@@ -97,7 +97,7 @@ from watermarking_method import WatermarkingMethod
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Keys for end of phase one/Sandra
+# Keys for end of phase one/
 KEYS_DIR = os.path.join(BASE_DIR, "keys")
 CLIENT_KEYS_DIR = os.path.join(KEYS_DIR, "clients")
 SERVER_PUB = os.path.join(KEYS_DIR, "server_pub.asc")
@@ -1022,13 +1022,13 @@ def create_app():
         link     = payload.get("link") # NEW: Support to read through the link
         version_id = payload.get("version_id") or payload.get("versionId")  #so they only need a key
 
-    # CHANGED /Sandra
+    # CHANGED /
         if not isinstance(key, str):
             return jsonify({"error": "key is required"}), 400 #Added/
 
         storage_root = Path(app.config["STORAGE_DIR"]).resolve()  # MOVED
 
-#I changed this so they only need the key and not method /Sandra
+#I changed this so they only need the key and not method /
         try:
             with get_engine().connect() as conn:
                 file_row = None
@@ -1052,7 +1052,7 @@ def create_app():
                     method = vrow.method or method   
                     link   = vrow.link or link       
 
-                elif link:  # old code here /Sandra
+                elif link:  # old code here /
                     file_row = conn.execute(
                         text("""
                             SELECT v.path
@@ -1069,7 +1069,7 @@ def create_app():
                         return jsonify({"error": "version not found"}), 404
                     file_path = Path(file_row.path)
 
-                else:  # Fallback: originalfile /Sandra
+                else:  # Fallback: originalfile /
                     doc_row = conn.execute(
                         text("""
                             SELECT path
@@ -1086,7 +1086,7 @@ def create_app():
         except Exception as e:
             return jsonify({"error": f"database error: {str(e)}"}), 503
 
-    # Path resolution and file checks (unchanged) /Sandra
+    # Path resolution and file checks (unchanged) /
         if not file_path.is_absolute():
             file_path = (storage_root / file_path).resolve()
         else:
@@ -1099,11 +1099,11 @@ def create_app():
             return jsonify({"error": "file missing on disk"}), 410
 
         try:
-    # Try with position if supported /Sandra
+    # Try with position if supported /
             try:
                 result = WMUtils.read_watermark(method=method, pdf=str(file_path), key=key, position=position)
             except TypeError:
-        # The method does not accept 'position' —> proceeding without it/Sandra
+        # The method does not accept 'position' —> proceeding without it/
                 result = WMUtils.read_watermark(method=method, pdf=str(file_path), key=key)
 
             if isinstance(result, tuple) and len(result) == 2:
@@ -1120,12 +1120,12 @@ def create_app():
                 "method": method,
                 "position": position,
                 "secret": secret
-            }), 200  # CHANGED: retur 200 OK instead of 201 Created /Sandra
+            }), 200  # CHANGED: retur 200 OK instead of 201 Created /
 
         except Exception as e:
             return jsonify({"error": f"Error when attempting to read watermark: {e}"}), 400
 
-#added this for end of phase one/Sandra
+#added this for end of phase one/
 
     def _version_output_path(document_id: int, link_hex: str) -> Path:
         root = Path(current_app.config["STORAGE_DIR"]) / "versions"
@@ -1248,7 +1248,7 @@ def create_app():
 
 
         if isinstance(session_info, dict):
-            # if its already a link /Sandra
+            # if its already a link /
             maybe_result = session_info.get("result") or session_info.get("link")
             if isinstance(maybe_result, str):
                 s = maybe_result.strip()
@@ -1285,7 +1285,7 @@ def create_app():
                 identity = _identity_from_ns(ns)
                 pdf_path = _create_rmap_watermarked_pdf(link_hex, identity=identity)
                 _store_rmap_version(link_hex, pdf_path)
-                return jsonify({"result": link_hex}), 200 #returns the link /Sandra
+                return jsonify({"result": link_hex}), 200 #returns the link /
 
 
         return jsonify({"error": "Invalid session info (missing nonces)",
@@ -1295,7 +1295,7 @@ def create_app():
     def _identity_from_ns(ns: int) -> str | None:
         """
         Försök hitta identity via nonceServer (ns) i RMAP:s in-memory state.
-        RMAP håller self.nonces: {identity: (nonceClient, nonceServer)} / Sandra
+        RMAP håller self.nonces: {identity: (nonceClient, nonceServer)} / 
         """
         try:
             for ident, pair in getattr(rmap, "nonces", {}).items():
@@ -1310,7 +1310,7 @@ def create_app():
 
 
 
-    #added this for the brute-force thing aka. flask_limiter /Sandra
+    #added this for the brute-force thing aka. flask_limiter /
     @app.errorhandler(429)
     def ratelimit_handler(e):
         return jsonify(error="rate_limited", detail=str(e.description)), 429
