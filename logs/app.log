@@ -65,3 +65,4 @@
 {"message": "Logger initialized", "event": "startup", "log_path": "/var/log/app/app.log", "taskName": null}
 {"message": "Logger initialized", "event": "startup", "log_path": "/var/log/app/app.log", "taskName": null}
 {"message": "Logger initialized", "event": "startup", "log_path": "/var/log/app/app.log", "taskName": null}
+{"message": "Logger initialized", "event": "startup", "log_path": "/var/log/app/app.log", "taskName": null}
