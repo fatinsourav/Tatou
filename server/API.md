@@ -26,8 +26,8 @@
 - [read-watermark](#read-watermark)
   - **POST** `/api/read-watermark/<int:document_id>`
   - **POST** `/api/read-watermark`
-- [upload-document](#upload-document) — **POST** `/api/upload-document` #added for end of phase 1 /Sandra
-- [rmap-initiate](#rmap-initiate) — **POST** `/api/rmap-initiate` #added for end of phase 1 /Sandra
+- [upload-document](#upload-document) — **POST** `/api/upload-document` #added for end of phase 1 /
+- [rmap-initiate](#rmap-initiate) — **POST** `/api/rmap-initiate` #added for end of phase 1 /
 
 
 - [rmap-get-link](#rmap-get-link) — **POST** `/api/rmap-get-link`
@@ -401,7 +401,7 @@ This endpoint reads information contain in a pdf document's watermark with the p
 }
 ```
 
-**Specification** #added this for end of phase 1 update / Sandra 
+**Specification** #added this for end of phase 1 update / 
 * Only the owner of a document should be able to create watermarked versions of their documents
  * The document owner MUST be able to list all versions of their documents and their intended recipients
 
