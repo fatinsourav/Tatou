@@ -111,14 +111,10 @@ VERSIONS_DIR = Path(BASE_DIR) / "storage" / "versions"  # ADD THIS LINE
 
 
 def init_rmap():
-    """Initialize RMAP with right key paths and passphrase."""
-    passphrase = os.environ.get("SERVER_PRIV_PASSPHRASE", "fatinsiratsourav")
-    
     id_manager = IdentityManager(
-        CLIENT_KEYS_DIR,  # clients public keys (clients/*.asc)
-        SERVER_PUB,       # server's public key
-        SERVER_PRIV,      # server's private key
-        passphrase        # ADD THIS: passphrase for private key
+        CLIENT_KEYS_DIR,  # clients public keys  
+        SERVER_PUB,       # servers public keys /
+        SERVER_PRIV,       # servers private key /
     )
     return RMAP(id_manager)
 
@@ -1154,10 +1150,9 @@ def create_app():
         )
             out_path.write_bytes(watermarked_bytes)
             return str(out_path)
-        except Exception:
+        except Exception as e:
         # Fallback: copy original
-            out_path.write_bytes(Path(BASE_PDF).read_bytes())
-            return str(out_path)
+            raise RuntimeError(f"Watermarking failed: {e}")
 
 
     def _store_rmap_version(link_hex: str, path: str) -> None:
