@@ -115,6 +115,7 @@ def init_rmap():
         CLIENT_KEYS_DIR,  # clients public keys  
         SERVER_PUB,       # servers public keys /
         SERVER_PRIV,       # servers private key /
+        ""
     )
     return RMAP(id_manager)
 
