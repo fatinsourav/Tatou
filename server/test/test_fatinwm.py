@@ -1,6 +1,19 @@
+import os
+import sys
 import io
 import pytest
 
+# -------------------------------------------------------
+# Ensure the src/ directory is on sys.path
+# -------------------------------------------------------
+# test/ directory = /home/lab/Tatou/server/test
+# src/ directory  = /home/lab/Tatou/server/src
+CURRENT_DIR = os.path.dirname(__file__)
+SRC_DIR = os.path.join(os.path.dirname(CURRENT_DIR), "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+# Now these imports will succeed:
 from fatinWM import FatinWM
 from watermarking_method import SecretNotFoundError, InvalidKeyError
 
