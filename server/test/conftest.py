@@ -39,9 +39,9 @@ def app_with_db():
     sqlite_path = pathlib.Path("test_db.sqlite").absolute()
     engine = create_engine(f"sqlite:///{sqlite_path}", future=True)
 
-    # --- Emulate MySQL's UNHEX() function in SQLite ------------------------
+    # --- Emulate MySQL functions UNHEX() and LAST_INSERT_ID() in SQLite -----
     @event.listens_for(engine, "connect")
-    def register_unhex(dbapi_connection, connection_record):
+    def register_mysql_compat(dbapi_connection, connection_record):
         import binascii
 
         def unhex(s):
@@ -52,7 +52,19 @@ def app_with_db():
             s = s.strip()
             return binascii.unhexlify(s)
 
+        def last_insert_id():
+            # Approximate MySQL's LAST_INSERT_ID() using the max(id)
+            # from Documents. Good enough for single-threaded tests.
+            cur = dbapi_connection.cursor()
+            try:
+                cur.execute("SELECT MAX(id) FROM Documents")
+                row = cur.fetchone()
+            finally:
+                cur.close()
+            return row[0] if row and row[0] is not None else 1
+
         dbapi_connection.create_function("UNHEX", 1, unhex)
+        dbapi_connection.create_function("LAST_INSERT_ID", 0, last_insert_id)
     # -----------------------------------------------------------------------
 
     # Minimal schema compatible with the queries in server.py
