@@ -128,7 +128,8 @@ def test_read_watermark_roundtrip(client, auth_headers):
 
 
 def test_delete_document_removes_access(client, auth_headers):
-    doc = _upload_pdf(client, auth_headers, name="delete_me.pdf")
+    # use a name that passes the server's validation (letters + digits + dot)
+    doc = _upload_pdf(client, auth_headers, name="deleteme.pdf")
     doc_id = doc["id"]
 
     # Delete (should be 200 OK)
@@ -138,3 +139,4 @@ def test_delete_document_removes_access(client, auth_headers):
     # Getting the doc again should return 404
     r = client.get(f"/api/get-document/{doc_id}", headers=auth_headers)
     assert r.status_code == 404
+

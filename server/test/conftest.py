@@ -4,18 +4,17 @@ import pathlib
 import sqlite3
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 
 # ---------------------------------------------------------------------------
 # Basic test configuration
 # ---------------------------------------------------------------------------
 
-# Disable rate limiting in tests (your server reads these env vars)
+# Disable rate limiting in tests
 os.environ.setdefault("RATELIMIT_ENABLED", "0")
 os.environ.setdefault("RATELIMIT_STORAGE_URI", "memory://")
 
-# Point the app at "dummy" DB settings – they won't be used because we inject
-# our own SQLAlchemy engine below.
+# Dummy DB settings (real connection replaced by our SQLite engine)
 os.environ.setdefault("DB_HOST", "localhost")
 os.environ.setdefault("DB_PORT", "3306")
 os.environ.setdefault("DB_USER", "test")
@@ -35,10 +34,26 @@ def app_with_db():
 
     This makes the server use SQLite for tests instead of MariaDB.
     """
-    from server import app  # imports src/server.py
+    from server import app  # 'server' is the package from src/server.py
 
     sqlite_path = pathlib.Path("test_db.sqlite").absolute()
     engine = create_engine(f"sqlite:///{sqlite_path}", future=True)
+
+    # --- Emulate MySQL's UNHEX() function in SQLite ------------------------
+    @event.listens_for(engine, "connect")
+    def register_unhex(dbapi_connection, connection_record):
+        import binascii
+
+        def unhex(s):
+            if s is None:
+                return None
+            if isinstance(s, bytes):
+                s = s.decode("ascii")
+            s = s.strip()
+            return binascii.unhexlify(s)
+
+        dbapi_connection.create_function("UNHEX", 1, unhex)
+    # -----------------------------------------------------------------------
 
     # Minimal schema compatible with the queries in server.py
     ddl_statements = [
@@ -88,7 +103,7 @@ def app_with_db():
         for stmt in ddl_statements:
             conn.execute(text(stmt))
 
-    # Tell the Flask app to use this engine instead of creating a new one
+    # Tell the Flask app to use this engine instead of MySQL
     app.config["_ENGINE"] = engine
     app.config["TESTING"] = True
 
@@ -141,7 +156,6 @@ def auth_token(client):
 @pytest.fixture(scope="session")
 def auth_headers(auth_token):
     """Convenience fixture: Authorization header for authenticated routes."""
-    # Your API expects "Bearer <token>" style header.
     if not auth_token.startswith("Bearer "):
         return {"Authorization": f"Bearer {auth_token}"}
     return {"Authorization": auth_token}
@@ -153,7 +167,7 @@ def tiny_valid_pdf_bytes():
     Return a tiny but syntactically valid one-page PDF as bytes.
     This is good enough for watermarking tests and upload tests.
     """
-    return b"%PDF-1.4\\n1 0 obj\\n<< /Type /Catalog >>\\nendobj\\n%%EOF\\n"
+    return b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n"
 
 
 @pytest.fixture
