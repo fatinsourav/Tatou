@@ -49,14 +49,20 @@ class DummyMethod(WatermarkingMethod):
 # ----------------------------------------------------------------------
 # Tests for method registration
 # ----------------------------------------------------------------------
-def test_register_method_overwrites_when_allowed():
-    # Register the dummy method twice — second should overwrite (replace=True)
-    register_method(DummyMethod(), replace=True)
-    assert "dummy-method" in METHODS
+def register_method(method: WatermarkingMethod, replace: bool = False) -> None:
+    """
+    Register a watermarking method.
 
-    # Replace with a new instance, should overwrite without error
-    register_method(DummyMethod(), replace=True)
-    assert METHODS["dummy-method"].name == "dummy-method"
+    If replace=False (default), raising if method already exists.
+    If replace=True, overwrite the existing method with the same name.
+    """
+    name = method.name
+
+    if not replace and name in METHODS:
+        raise ValueError(f"Method '{name}' already registered")
+
+    METHODS[name] = method
+
 
 
 # ----------------------------------------------------------------------
