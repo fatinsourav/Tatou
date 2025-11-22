@@ -1,6 +1,4 @@
 import io
-import base64
-import json
 import pytest
 
 from add_after_eof import AddAfterEOF
@@ -50,7 +48,8 @@ def test_add_after_eof_roundtrip_secret_ok():
     wm_pdf = method.add_watermark(pdf=pdf, secret=secret, key=key)
     assert wm_pdf.startswith(b"%PDF")  # still a PDF
 
-    recovered = method.read_watermark(pdf=wm_pdf, key=key)
+    # Use the generic registry-based reader instead of method.read_watermark
+    recovered = read_watermark(method="toy-eof", pdf=wm_pdf, key=key)
     assert recovered == secret
 
 
@@ -63,18 +62,20 @@ def test_add_after_eof_wrong_key_raises():
 
     wm_pdf = method.add_watermark(pdf=pdf, secret=secret, key=key_ok)
     with pytest.raises(InvalidKeyError):
-        method.read_watermark(pdf=wm_pdf, key=key_bad)
+        read_watermark(method="toy-eof", pdf=wm_pdf, key=key_bad)
 
 
 def test_add_after_eof_secret_not_found():
     method = AddAfterEOF()
     pdf = tiny_pdf_bytes()
+
+    # No watermark present, so reading should raise SecretNotFoundError
     with pytest.raises(SecretNotFoundError):
-        method.read_watermark(pdf=pdf, key="whatever")
+        read_watermark(method="toy-eof", pdf=pdf, key="whatever")
 
 
 def test_registry_contains_methods():
-    # at least the toy-eof and fatin methods should be registered
+    # At least the toy-eof method should be registered
     assert "toy-eof" in METHODS
     assert get_method("toy-eof") is METHODS["toy-eof"]
 
@@ -93,4 +94,5 @@ def test_is_watermarking_applicable_helpers():
     pdf = tiny_pdf_bytes()
     # should not raise when called correctly
     applicable = is_watermarking_applicable("toy-eof", pdf=pdf, position=None)
-    assert applicable is True or applicable is False or applicable is None
+    # Implementation may return True/False/None depending on method semantics
+    assert applicable in (True, False, None)
