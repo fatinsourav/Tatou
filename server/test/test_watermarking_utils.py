@@ -25,14 +25,25 @@ class DummyMethod(WatermarkingMethod):
     name = "dummy-method"
 
     def add_watermark(self, pdf, secret, key, position=None):
+        # For testing, just return the input PDF unchanged
         return pdf
 
     def read_watermark(self, pdf, key, position=None):
+        # Legacy-style read, delegate to read_secret
+        return self.read_secret(pdf=pdf, key=key, position=position)
+
+    def read_secret(self, pdf, key, position=None):
+        # Minimal implementation to satisfy abstract API
         return "dummy"
+
+    def is_watermark_applicable(self, pdf, position=None) -> bool:
+        # For tests, always say it's applicable
+        return True
 
     def get_usage(self):
         # Minimal implementation to satisfy the abstract base class
         return "dummy usage"
+
 
 
 # ----------------------------------------------------------------------
