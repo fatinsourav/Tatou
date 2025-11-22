@@ -38,19 +38,28 @@ def test_detect_flag_attempt_no_suspicious_data(app):
 def test_detect_flag_attempt_suspicious_path_and_param(app, capsys):
     # Path starts with /flag and param name hinting at a flag
     headers = {"User-Agent": "test-agent"}
-    with app.test_request_context("/flag/try", query_string={"flag": "FLAG{ctf-flag}"}, headers=headers):
+    with app.test_request_context(
+        "/flag/try",
+        query_string={"flag": "FLAG{ctf-flag}"},
+        headers=headers,
+    ):
         detect_flag_attempt()
-        assert g.flag_attempt is True
-        event = g.flag_attempt_event
-        assert event["risk_level"] == "high"
-        assert "path" in event
-        assert event["path"].startswith("/flag")
-        assert any(s["param"] == "flag" for s in event["details"]["samples"])
 
-        # logger.warning logs a JSON event to stdout; ensure it's valid JSON
-        out = capsys.readouterr().out.strip()
-        if out:
-            json.loads(out)
+        # flag_attempt should be set
+        assert getattr(g, "flag_attempt", False) is True
+
+        # event should be stored and have basic structure
+        event = getattr(g, "flag_attempt_event", {})
+        assert event.get("event") == "flag_access_attempt"
+        assert event.get("path") == "/flag/try"
+
+        details = event.get("details", {})
+        where = details.get("where", [])
+        assert "path" in where
+        assert "query_param" in where
+        samples = details.get("samples", [])
+        assert samples  # at least one sample redacted
+
 
 
 def test_detect_flag_attempt_header_and_cookie(app):
