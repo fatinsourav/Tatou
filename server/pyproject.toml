@@ -28,8 +28,10 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "--cov=src --cov-report=term-missing -q"
 testpaths = ["test/"]
+python_files = ["test_*.py"]
+
 python_files = ["test_*.py"]
 
 [project.scripts]
