@@ -1,12 +1,13 @@
 import pytest
-from src.watermarking_utils import (
+
+from watermarking_utils import (
     register_method,
     apply_watermark,
     read_watermark,
     METHODS,
     explore_pdf,
 )
-from src.watermarking_method import WatermarkingMethod
+from watermarking_method import WatermarkingMethod
 
 
 # ----------------------------------------------------------------------
@@ -30,6 +31,7 @@ class DummyMethod(WatermarkingMethod):
         return "dummy"
 
     def get_usage(self):
+        # Minimal implementation to satisfy the abstract base class
         return "dummy usage"
 
 
@@ -59,11 +61,11 @@ def test_apply_watermark_and_read_watermark_roundtrip_toy_eof():
         pdf=pdf,
         secret=secret,
         key=key,
-        position=None,   # apply_watermark supports this kwarg
+        position=None,  # apply_watermark accepts this kwarg
     )
     assert wm_pdf.startswith(b"%PDF")
 
-    # read_watermark does NOT take position currently
+    # read_watermark in your code does NOT take a position kwarg
     recovered = read_watermark("toy-eof", pdf=wm_pdf, key=key)
     assert isinstance(recovered, str)
 
