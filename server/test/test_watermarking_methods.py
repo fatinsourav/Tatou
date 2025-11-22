@@ -96,3 +96,21 @@ def test_is_watermarking_applicable_helpers():
     applicable = is_watermarking_applicable("toy-eof", pdf=pdf, position=None)
     # Implementation may return True/False/None depending on method semantics
     assert applicable in (True, False, None)
+
+
+def test_get_method_invalid_name_raises():
+    with pytest.raises(KeyError):
+        get_method("nonexistent-method")
+
+
+def test_apply_watermark_unknown_method_raises():
+    pdf = tiny_pdf_bytes()
+    with pytest.raises(KeyError):
+        apply_watermark(method="does-not-exist", pdf=pdf, secret="x", key="y")
+
+
+def test_read_watermark_unknown_method_raises():
+    pdf = tiny_pdf_bytes()
+    with pytest.raises(KeyError):
+        read_watermark(method="does-not-exist", pdf=pdf, key="y")
+
