@@ -30,3 +30,20 @@ def test_load_plugin_invalid_path(client, auth_headers):
     assert r.status_code in (400, 404, 500)
     data = r.get_json()
     assert "error" in data
+
+    
+def test_rmap_initiate_invalid_data_type(client, auth_headers):
+    # Send something of wrong type to exercise validation
+    r = client.post(
+        "/api/rmap-initiate",
+        headers=auth_headers,
+        json={"not_expected": "value"},
+    )
+    assert r.status_code in (400, 422)
+    assert "error" in r.get_json()
+
+
+def test_load_plugin_missing_path(client, auth_headers):
+    r = client.post("/api/load-plugin", headers=auth_headers, json={})
+    assert r.status_code in (400, 422)
+    assert "error" in r.get_json()
