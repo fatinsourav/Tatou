@@ -2,7 +2,8 @@ import json
 import pytest
 from flask import Flask, g, request
 
-from src.flag_detection import mask_flag_in_text, detect_flag_attempt
+from flag_detection import mask_flag_in_text, detect_flag_attempt
+
 
 
 @pytest.fixture
