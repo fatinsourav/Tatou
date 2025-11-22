@@ -2,7 +2,8 @@ import io
 import base64
 import pytest
 
-from src.watermarking_utils import (
+
+from watermarking_utils import (
     METHODS,
     register_method,
     get_method,
@@ -11,7 +12,8 @@ from src.watermarking_utils import (
     is_watermarking_applicable,
     explore_pdf,
 )
-from src.watermarking_method import WatermarkingMethod
+from watermarking_method import WatermarkingMethod
+
 
 
 class DummyMethod(WatermarkingMethod):
