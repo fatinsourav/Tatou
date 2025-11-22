@@ -3,35 +3,36 @@ name = "Tatou-Server"
 version = "0.0.1"
 description = "PDF Watermarking platform"
 requires-python = ">=3.11"
-dependencies = [
-	"PyMuPDF>=1.21.1",
-	"Flask==3.0.3",
-	"gunicorn==21.2.0",
-	"PyMySQL==1.1.2",
-	"SQLAlchemy==2.0.43",
-	"dill==0.4.0",
-	"rmap @https://github.com/nharrand/RMAP-Server/releases/download/v2.0.0/rmap-2.0.0-py3-none-any.whl", # correct version added
-	"Flask-Limiter>=3.0.0", # added this one for the brute-force thing/
-	"pikepdf>=8,<11", #added for my WM method nr2/
-	"pypdf>=4.0.0", #added for my WM method/
-  	"cryptography>=42.0.0", #added for my WM method /
-	"python-json-logger==2.0.7", #added for logging /
-	"pytest-timeout>=2.3.1"
 
+dependencies = [
+    "PyMuPDF>=1.21.1",
+    "Flask==3.0.3",
+    "gunicorn==21.2.0",
+    "PyMySQL==1.1.2",
+    "SQLAlchemy==2.0.43",
+    "dill==0.4.0",
+    "rmap @ https://github.com/nharrand/RMAP-Server/releases/download/v2.0.0/rmap-2.0.0-py3-none-any.whl",
+    "Flask-Limiter>=3.0.0",
+    "cryptography>=42.0.0",          # keep only the newest version
+    "pikepdf>=8,<11",
+    "pypdf>=4.0.0",
+    "python-json-logger==2.0.7",
+    "python-dotenv>=1.0",
+    "pytest-timeout>=2.3.1"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-	"pytest-cov>=4.1"
+    "hypothesis>=6.100",
+    "schemathesis>=4.0",
+    "pytest-cov>=4.1"
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=src --cov-report=term-missing -q"
+addopts = "-q"
 testpaths = ["test/"]
 python_files = ["test_*.py"]
 
-python_files = ["test_*.py"]
-
 [project.scripts]
-pdfwm = "watermarking_cli:main"                 # now you can run `pdfwm methods`
+pdfwm = "watermarking_cli:main"
