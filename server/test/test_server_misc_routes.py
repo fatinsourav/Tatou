@@ -1,6 +1,5 @@
 import io
 import pytest
-from src.server import app as flask_app
 
 
 def _upload_simple_pdf(client, auth_headers, filename: str):
