@@ -1,93 +1,106 @@
 """
-Helpers for recording fuzzing failures and turning them into regression tests.
+Regression tests for fuzzing failures.
 
-When a fuzz test detects an unexpected 5xx, it should call `record_failure(...)`.
-This writes a small JSON file under `fuzzing/findings/` with enough information
-to replay the request.
+This module does *not* generate tests itself; instead, it loads JSON files
+from `fuzzing/findings/` created by the fuzzing layer (see
+`fuzzing/regression_helpers.py`) and replays them as normal API calls.
 
-A generic test module `test/test_fuzz_regressions.py` will then pick up all
-JSON files in that directory and replay them as normal pytest tests.
+Workflow:
+    1. Run the fuzz tests (test_fuzz_api.py) against a buggy version.
+       Any unexpected 5xx responses will create JSON files under
+       fuzzing/findings/.
+    2. Fix the bug in the application.
+    3. Re-run the full test suite. This module will automatically
+       replay all recorded failures and ensure they no longer produce 5xx.
 """
 
 from __future__ import annotations
 
+import base64
+import io
 import json
-import uuid
-from dataclasses import dataclass, asdict
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List
 
-FINDINGS_DIR = Path(__file__).resolve().parent / "findings"
-FINDINGS_DIR.mkdir(parents=True, exist_ok=True)
+import pytest
 
-
-@dataclass
-class RegressionCase:
-    name: str
-    method: str
-    path: str
-    status_code: int
-    request: Dict[str, Any]
-    response_body: Optional[str] = None
-
-    def to_json(self) -> Dict[str, Any]:
-        return asdict(self)
+FINDINGS_DIR = Path(__file__).resolve().parent.parent / "fuzzing" / "findings"
 
 
-def record_failure(
-    base_case: Dict[str, Any],
-    status_code: int,
-    response_body: Optional[str] = None,
-) -> Path:
+def _load_cases() -> List[Dict[str, Any]]:
+    if not FINDINGS_DIR.is_dir():
+        return []
+    cases: List[Dict[str, Any]] = []
+    for path in sorted(FINDINGS_DIR.glob("*.json")):
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["_source_file"] = str(path)
+            cases.append(data)
+        except Exception:
+            # Malformed JSON shouldn't break the whole test run
+            continue
+    return cases
+
+
+CASES = _load_cases()
+
+
+@pytest.mark.skipif(
+    not CASES,
+    reason="No fuzzing regression cases recorded yet (fuzzing/findings is empty)",
+)
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c.get("name", "<unnamed>"))
+def test_fuzz_regressions(client, auth_headers, case: Dict[str, Any]):
     """
-    Persist a fuzzing failure as a JSON file.
+    Generic replay of fuzzing failures.
 
-    Parameters
-    ----------
-    base_case:
-        Dictionary describing the request that triggered the failure.
-        It *must* contain at least:
-            - "name": short identifier for the fuzz test
-            - "method": HTTP method (GET/POST/DELETE/...)
-            - "path": path string (e.g. "/api/upload-document" or
-                      "/api/get-document/<id>" – both are fine)
-        It may also contain arbitrary additional keys such as "json",
-        "filename", "bytes_b64", etc. They will be stored under the
-        "request" field.
-    status_code:
-        Actual HTTP status code observed (typically 5xx).
-    response_body:
-        Optional textual body of the response, for debugging.
-
-    Returns
-    -------
-    Path
-        The path of the JSON file written under fuzzing/findings/.
+    We support two broad shapes:
+        - JSON requests (request['json'] present)
+        - Upload-style requests (request['bytes_b64'] present)
     """
-    required_keys = {"name", "method", "path"}
-    missing = required_keys - base_case.keys()
-    if missing:
-        raise ValueError(f"record_failure: base_case is missing keys: {missing}")
+    method = case["method"].upper()
+    path = case["path"]
+    request = case.get("request", {})
+    status_code = int(case.get("status_code", 500))
 
-    case = RegressionCase(
-        name=str(base_case["name"]),
-        method=str(base_case["method"]),
-        path=str(base_case["path"]),
-        status_code=int(status_code),
-        request={
-            k: v for k, v in base_case.items()
-            if k not in ("name", "method", "path")
-        },
-        response_body=response_body,
+    # Build common arguments
+    kwargs: Dict[str, Any] = {}
+    kwargs["headers"] = auth_headers
+
+    if "json" in request:
+        kwargs["json"] = request["json"]
+
+    # Special handling for upload-style cases that stored base64 bytes
+    if "bytes_b64" in request and "filename" in request:
+        raw_bytes = base64.b64decode(request["bytes_b64"].encode("ascii"))
+        pdf_io = io.BytesIO(raw_bytes)
+        filename = request["filename"]
+        kwargs["data"] = {"file": (pdf_io, filename), "name": filename}
+        kwargs["content_type"] = "multipart/form-data"
+
+    # Dispatch to the correct FlaskClient method
+    client_method = {
+        "GET": client.get,
+        "POST": client.post,
+        "DELETE": client.delete,
+        "PUT": client.put,
+        "PATCH": client.patch,
+    }.get(method)
+
+    assert client_method is not None, f"Unsupported HTTP method in case: {method}"
+
+    response = client_method(path, **kwargs)
+
+    # The *regression* requirement is: no more 5xx.
+    assert response.status_code < 500, (
+        f"Regression case from {case.get('_source_file')} still produces 5xx "
+        f"({response.status_code})"
     )
 
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    unique = uuid.uuid4().hex[:8]
-    filename = f"{case.name}_{timestamp}_{unique}.json"
-    out_path = FINDINGS_DIR / filename
-
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(case.to_json(), f, indent=2, sort_keys=True)
-
-    return out_path
+    # Optionally tighten the assertion: if the original 5xx was a specific
+    # status (e.g. 500), we can also assert the new status is different.
+    assert response.status_code != status_code, (
+        f"Expected fixed behaviour for regression case {case.get('_source_file')}, "
+        f"but got the same HTTP status {response.status_code}"
+    )
