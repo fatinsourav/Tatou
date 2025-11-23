@@ -1,0 +1,134 @@
+# ==========================================================
+# Tatou API Fuzzing Configuration
+# ==========================================================
+
+fuzzer: hypothesis
+version: 1.0
+
+description: |
+  Property-based fuzzing for Tatou's API.
+  This configuration enumerates the endpoints to fuzz, input strategies,
+  and global fuzzing limits. RMAP endpoints are intentionally excluded.
+
+global_settings:
+  max_examples: 30        # per test; increase to 200+ for long campaigns
+  deadline: null          # disable per-example timeouts
+  suppress_health_checks:
+    - function_scoped_fixture
+
+excluded_endpoints:
+  - "/api/rmap/*"
+
+# ==========================================================
+# Endpoint-level fuzzing settings
+# ==========================================================
+endpoints:
+
+  - path: "/api/status"
+    method: GET
+    strategy: 
+      query:
+        key: ascii_text
+        value: ascii_text
+    properties:
+      - "never_500"
+      - "json_or_empty"
+
+  - path: "/api/create-user"
+    method: POST
+    strategy:
+      json:
+        login: safe_login
+        email: safe_email
+        password: ascii_text
+    properties:
+      - "never_500"
+      - "json_response"
+
+  - path: "/api/login"
+    method: POST
+    strategy:
+      json:
+        email: email_or_garbage
+        password: ascii_text
+    properties:
+      - "never_500"
+
+  - path: "/api/upload-document"
+    method: POST
+    strategy:
+      multipart:
+        filename: safe_login + ".pdf"
+        payload: 
+          - tiny_valid_pdf
+          - random_binary_0_4kb
+    properties:
+      - "never_500"
+      - "no_crash_on_invalid_pdf"
+
+  - path: "/api/list-documents"
+    method: GET
+    strategy:
+      query:
+        page: int_minus5_to_50
+        q: ascii_text
+    properties:
+      - "never_500"
+
+  - path: "/api/get-document/{id}"
+    method: GET
+    strategy:
+      headers:
+        Accept: ascii_text
+    properties:
+      - "never_500"
+
+  - path: "/api/delete-document/{id}"
+    method: DELETE
+    strategy:
+      none: true
+    properties:
+      - "never_500"
+
+  - path: "/api/list-versions/{id}"
+    method: GET
+    strategy:
+      query:
+        extra: ascii_text
+    properties:
+      - "never_500"
+
+  - path: "/api/list-all-versions"
+    method: GET
+    strategy:
+      query:
+        extra: ascii_text
+    properties:
+      - "never_500"
+
+  - path: "/api/get-watermarking-methods"
+    method: GET
+    properties:
+      - "never_500"
+
+  - path: "/api/create-watermark/{id}"
+    method: POST
+    strategy:
+      json:
+        method: valid_method_from_api
+        key: ascii_text
+        secret: ascii_text
+        position: null
+        intended_for: email
+    properties:
+      - "never_500"
+
+  - path: "/api/read-watermark/{id}"
+    method: POST
+    strategy:
+      json:
+        method: valid_method_from_api
+        key: ascii_text
+        position: null
+    properties:
+      - "never_500"
