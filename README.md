@@ -30,6 +30,9 @@ python -m pip install -e ".[dev]"
 
 # Run the unit tests
 python -m pytest
+
+#Coverage report
+python -m pytest -q --cov=src --cov-report=html
 ```
 
 ### Deploy
