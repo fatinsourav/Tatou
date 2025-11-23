@@ -241,11 +241,11 @@ def create_app():
 
 
     #shared limit for upload (per user/IP)
-    upload_limit = limiter.shared_limit(
+   """ upload_limit = limiter.shared_limit(
         "10 per minute; 100 per hour",  # Increased limits
         scope="upload",
         key_func=user_or_ip
-    )
+    )"""
 
 
 
@@ -318,7 +318,7 @@ def create_app():
         return app.send_static_file("index.html")
     
     @app.get("/healthz")
-    @limiter.exempt #added this, no restrictions 
+   # @limiter.exempt #added this, no restrictions 
     def healthz():
         try:
             with get_engine().connect() as conn:
@@ -388,8 +388,8 @@ def create_app():
 
     # POST /api/login {login, password}
     @app.post("/api/login")
-    @limiter.limit("3 per minute; 10 per hour", key_func=login_key)   # added per konto
-    @limiter.limit("20 per minute", key_func=get_remote_address)      # added per IP
+    #@limiter.limit("3 per minute; 10 per hour", key_func=login_key)   # added per konto
+    #@limiter.limit("20 per minute", key_func=get_remote_address)      # added per IP
     def login():
         payload = request.get_json(silent=True) or {}
         email = (payload.get("email") or "").strip()
@@ -1307,9 +1307,9 @@ def create_app():
 
 
     #added this for the brute-force thing aka. flask_limiter /
-    @app.errorhandler(429)
-    def ratelimit_handler(e):
-        return jsonify(error="rate_limited", detail=str(e.description)), 429
+   # @app.errorhandler(429)
+   # def ratelimit_handler(e):
+    #    return jsonify(error="rate_limited", detail=str(e.description)), 429
 
 
 
