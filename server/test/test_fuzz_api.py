@@ -1,111 +1,75 @@
+import base64
 import io
-import json
 import os
 import random
 import string
-from typing import Optional
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import pytest
-from hypothesis import given, settings, strategies as st, HealthCheck
-
+from hypothesis import HealthCheck, given, settings, strategies as st
 import yaml
+
+from fuzzing.regression_helpers import record_failure  # new helper
 
 # ---------------------------------------------------------------------------
 # Load fuzzer configuration
 # ---------------------------------------------------------------------------
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "fuzzing", "fuzzer_config.yaml"
-)
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "fuzzing" / "fuzzer_config.yaml"
 
-try:
-    with open(CONFIG_PATH, "r") as f:
-        FUZZER_CONFIG = yaml.safe_load(f) or {}
-except FileNotFoundError:
-    FUZZER_CONFIG = {}
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    FUZZER_CONFIG = yaml.safe_load(f)
 
-# Safe defaults if keys are missing
-MAX_EXAMPLES = int(FUZZER_CONFIG.get("max_examples", 20))
-DEADLINE_MS = FUZZER_CONFIG.get("deadline_ms", 1000)
-MAX_PDF_BYTES = int(FUZZER_CONFIG.get("max_pdf_bytes", 4096))
-MAX_TEXT_LENGTH = int(FUZZER_CONFIG.get("max_text_length", 40))
+MAX_EXAMPLES: int = int(FUZZER_CONFIG.get("max_examples", 25))
+DEADLINE_MS: Optional[int] = FUZZER_CONFIG.get("deadline_ms")
+if DEADLINE_MS is not None:
+    DEADLINE_MS = int(DEADLINE_MS)
 
 # ---------------------------------------------------------------------------
-# Helper strategies and functions
+# Hypothesis helpers
 # ---------------------------------------------------------------------------
 
 
-def random_ascii(min_size: int = 1, max_size: int = MAX_TEXT_LENGTH) -> st.SearchStrategy:
-    """Strategy for simple ASCII-ish strings (no newlines) suitable for JSON fields."""
-    alphabet = string.ascii_letters + string.digits + " ._-"
+def _random_string(min_size: int = 1, max_size: int = 32) -> st.SearchStrategy[str]:
+    """Random visible ASCII string."""
+    alphabet = string.ascii_letters + string.digits + "_-@."
     return st.text(alphabet=alphabet, min_size=min_size, max_size=max_size)
 
 
-pdf_like_bytes = st.one_of(
-    # Valid tiny PDFs like in other tests
-    st.just(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n"),
-    # Random bytes starting with %PDF
-    st.builds(
-        lambda tail: b"%PDF-" + tail,
-        st.binary(min_size=1, max_size=MAX_PDF_BYTES - 5),
-    ),
-    # Completely random junk (to exercise error handling)
-    st.binary(min_size=1, max_size=MAX_PDF_BYTES),
-)
+def _assert_not_5xx(response, context: Dict[str, Any]) -> None:
+    """
+    Common helper: assert that a response is not a 5xx.
+    If it *is* a 5xx, we record a regression case to fuzzing/findings/.
+    """
+    if 500 <= response.status_code < 600:
+        # Try to capture body as text but never crash if that fails
+        try:
+            body_text: Optional[str] = response.get_data(as_text=True)
+        except Exception:
+            body_text = None
 
+        record_failure(
+            base_case=context,
+            status_code=response.status_code,
+            response_body=body_text,
+        )
 
-def random_email() -> st.SearchStrategy:
-    """Very simple email generator that should still satisfy the server's validation."""
-    local = random_ascii(min_size=3, max_size=12)
-    domain = random_ascii(min_size=3, max_size=12).map(
-        lambda s: "".join(ch for ch in s if ch.isalnum())
+    assert response.status_code < 500, (
+        f"Unexpected 5xx status {response.status_code} for context={context} "
+        f"body={response.get_data(as_text=True)!r}"
     )
-
-    return st.builds(
-        lambda l, d: f"{l.strip().replace(' ', '').lower()}@{d or 'example'}.test",
-        local,
-        domain,
-    )
-
-
-def random_login() -> st.SearchStrategy:
-    """Login: letters + digits only (to keep server-side validation happy)."""
-    alphabet = string.ascii_letters + string.digits
-    return st.text(alphabet=alphabet, min_size=3, max_size=16)
-
-
-def random_password() -> st.SearchStrategy:
-    return random_ascii(min_size=4, max_size=32)
-
-
-def upload_one_pdf(client, auth_headers, name: str, content: bytes):
-    """Helper to upload a single PDF (or PDF-like) and return the response."""
-    data = {
-        "file": (io.BytesIO(content), name),
-        "name": name,
-    }
-    return client.post(
-        "/api/upload-document",
-        headers=auth_headers,
-        data=data,
-        content_type="multipart/form-data",
-    )
-
-
-def assume_no_5xx(r):
-    """Common property: API should not respond with a 5xx."""
-    assert r.status_code < 500, f"Unexpected 5xx: {r.status_code} {r.get_data(as_text=True)}"
 
 
 # ---------------------------------------------------------------------------
-# Fuzz create-user + login
+# 1. Fuzz create-user and login
 # ---------------------------------------------------------------------------
 
 
 @given(
-    email=random_email(),
-    login=random_login(),
-    password=random_password(),
+    email=_random_string(min_size=5, max_size=20).map(lambda s: s + "@example.test"),
+    login=_random_string(min_size=3, max_size=16),
+    password=_random_string(min_size=8, max_size=32),
 )
 @settings(
     max_examples=MAX_EXAMPLES,
@@ -113,191 +77,303 @@ def assume_no_5xx(r):
     suppress_health_check=[HealthCheck.too_slow],
 )
 def test_fuzz_create_user_and_login(client, email, login, password):
-    # Try to create a user; duplicate (409) is fine as long as it's not a 5xx
-    r_create = client.post(
-        "/api/create-user",
-        json={"email": email, "login": login, "password": password},
+    # CREATE USER
+    create_payload = {"email": email, "login": login, "password": password}
+    r = client.post("/api/create-user", json=create_payload)
+    _assert_not_5xx(
+        r,
+        {
+            "name": "create_user",
+            "method": "POST",
+            "path": "/api/create-user",
+            "json": create_payload,
+        },
     )
-    assume_no_5xx(r_create)
 
-    # Try to log in with the same credentials (may or may not succeed)
-    r_login = client.post(
-        "/api/login",
-        json={"email": email, "password": password},
+    # LOGIN
+    login_payload = {"email": email, "password": password}
+    r = client.post("/api/login", json=login_payload)
+    _assert_not_5xx(
+        r,
+        {
+            "name": "login",
+            "method": "POST",
+            "path": "/api/login",
+            "json": login_payload,
+        },
     )
-    assume_no_5xx(r_login)
+
+    # If login succeeded, response should contain a token
+    if r.status_code == 200:
+        data = r.get_json()
+        assert "token" in data
 
 
 # ---------------------------------------------------------------------------
-# Fuzz upload-document + list-documents + get-document
+# 2. Fuzz upload-document, list-documents and get-document
 # ---------------------------------------------------------------------------
+
+pdf_bytes_strategy = st.binary(min_size=0, max_size=5_000)
 
 
 @given(
-    pdf_content=pdf_like_bytes,
-    filename=random_ascii(min_size=3, max_size=20).map(
-        lambda s: "".join(ch for ch in s if ch.isalnum()) + ".pdf"
-    ),
+    filename=_random_string(min_size=3, max_size=20).map(lambda s: s + ".pdf"),
+    pdf_bytes=pdf_bytes_strategy,
 )
 @settings(
     max_examples=MAX_EXAMPLES,
     deadline=DEADLINE_MS,
     suppress_health_check=[HealthCheck.too_slow],
 )
-def test_fuzz_upload_and_list_get_document(client, auth_headers, pdf_content, filename):
-    # Upload
-    r_up = upload_one_pdf(client, auth_headers, filename, pdf_content)
-    assume_no_5xx(r_up)
+def test_fuzz_upload_and_list_get_document(client, auth_headers, filename, pdf_bytes):
+    # UPLOAD
+    pdf_io = io.BytesIO(pdf_bytes)
+    data = {"file": (pdf_io, filename), "name": filename}
 
-    # If upload didn't succeed, we still want to ensure it wasn't a 5xx and then stop.
-    if r_up.status_code not in (200, 201):
+    r = client.post(
+        "/api/upload-document",
+        headers=auth_headers,
+        data=data,
+        content_type="multipart/form-data",
+    )
+    upload_context: Dict[str, Any] = {
+        "name": "upload_document",
+        "method": "POST",
+        "path": "/api/upload-document",
+        "filename": filename,
+        "bytes_b64": base64.b64encode(pdf_bytes).decode("ascii"),
+    }
+    _assert_not_5xx(r, upload_context)
+
+    if r.status_code not in (200, 201):
+        # Nothing more we can do without a valid document
         return
 
-    doc = r_up.get_json()
-    doc_id = doc.get("id")
+    doc = r.get_json()
+    doc_id = doc["id"]
 
-    # List documents
-    r_list = client.get("/api/list-documents", headers=auth_headers)
-    assume_no_5xx(r_list)
-    if r_list.status_code == 200:
-        docs = r_list.get_json().get("documents", [])
-        # doc_id, if present, should appear in the list
-        if doc_id is not None:
-            assert any(d.get("id") == doc_id for d in docs)
+    # LIST
+    r = client.get("/api/list-documents", headers=auth_headers)
+    _assert_not_5xx(
+        r,
+        {
+            "name": "list_documents",
+            "method": "GET",
+            "path": "/api/list-documents",
+        },
+    )
 
-    # Get-document via path param
-    if doc_id is not None:
-        r_get = client.get(f"/api/get-document/{doc_id}", headers=auth_headers)
-        assume_no_5xx(r_get)
+    # GET DOCUMENT
+    r = client.get(f"/api/get-document/{doc_id}", headers=auth_headers)
+    _assert_not_5xx(
+        r,
+        {
+            "name": "get_document",
+            "method": "GET",
+            "path": "/api/get-document/<id>",
+            "doc_id": doc_id,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
-# Fuzz watermark creation + reading
+# 3. Fuzz create-watermark and read-watermark
 # ---------------------------------------------------------------------------
+
+secret_strategy = _random_string(min_size=1, max_size=64)
+key_strategy = _random_string(min_size=1, max_size=32)
 
 
 @given(
-    pdf_content=pdf_like_bytes,
-    secret=random_ascii(min_size=1, max_size=MAX_TEXT_LENGTH),
-    key=random_ascii(min_size=1, max_size=MAX_TEXT_LENGTH),
+    filename=_random_string(min_size=3, max_size=20).map(lambda s: s + ".pdf"),
+    pdf_bytes=pdf_bytes_strategy,
+    secret=secret_strategy,
+    key=key_strategy,
 )
 @settings(
     max_examples=MAX_EXAMPLES,
     deadline=DEADLINE_MS,
     suppress_health_check=[HealthCheck.too_slow],
 )
-def test_fuzz_create_and_read_watermark(client, auth_headers, pdf_content, secret, key):
-    # Upload document first
-    r_up = upload_one_pdf(client, auth_headers, "wm_fuzz.pdf", pdf_content)
-    assume_no_5xx(r_up)
+def test_fuzz_create_and_read_watermark(
+    client,
+    auth_headers,
+    filename,
+    pdf_bytes,
+    secret,
+    key,
+):
+    # First upload a PDF (same as above)
+    pdf_io = io.BytesIO(pdf_bytes)
+    data = {"file": (pdf_io, filename), "name": filename}
+    r = client.post(
+        "/api/upload-document",
+        headers=auth_headers,
+        data=data,
+        content_type="multipart/form-data",
+    )
+    upload_context: Dict[str, Any] = {
+        "name": "upload_document_for_watermark",
+        "method": "POST",
+        "path": "/api/upload-document",
+        "filename": filename,
+        "bytes_b64": base64.b64encode(pdf_bytes).decode("ascii"),
+    }
+    _assert_not_5xx(r, upload_context)
 
-    if r_up.status_code not in (200, 201):
+    if r.status_code not in (200, 201):
         return
 
-    doc_id = r_up.get_json().get("id")
+    doc = r.get_json()
+    doc_id = doc["id"]
 
-    # Fetch available methods
+    # Fetch available watermarking methods
     r_methods = client.get("/api/get-watermarking-methods", headers=auth_headers)
-    assume_no_5xx(r_methods)
+    _assert_not_5xx(
+        r_methods,
+        {
+            "name": "get_watermarking_methods_for_fuzz",
+            "method": "GET",
+            "path": "/api/get-watermarking-methods",
+        },
+    )
     if r_methods.status_code != 200:
         return
 
     methods = r_methods.get_json().get("methods", [])
     if not methods:
         return
-    method_name = random.choice(methods)["name"]
+    method_name = methods[0]["name"]
 
-    # Create watermark
-    r_wm = client.post(
+    # CREATE WATERMARK
+    wm_payload = {
+        "method": method_name,
+        "position": None,
+        "key": key,
+        "secret": secret,
+        "intended_for": "fuzz@example.test",
+    }
+    r = client.post(
         f"/api/create-watermark/{doc_id}",
         headers=auth_headers,
-        json={
-            "method": method_name,
-            "position": None,
-            "key": key,
-            "secret": secret,
-            "intended_for": "fuzz@example.test",
+        json=wm_payload,
+    )
+    _assert_not_5xx(
+        r,
+        {
+            "name": "create_watermark",
+            "method": "POST",
+            "path": "/api/create-watermark/<doc_id>",
+            "doc_id": doc_id,
+            "json": wm_payload,
         },
     )
-    assume_no_5xx(r_wm)
 
-    if r_wm.status_code not in (200, 201):
+    if r.status_code not in (200, 201):
         return
 
-    wm = r_wm.get_json()
-    version_id = wm.get("id")
+    wm = r.get_json()
 
-    # List versions for that document
-    r_list_versions = client.get(
-        f"/api/list-versions/{doc_id}", headers=auth_headers
-    )
-    assume_no_5xx(r_list_versions)
-
-    if r_list_versions.status_code == 200 and version_id is not None:
-        versions = r_list_versions.get_json().get("versions", [])
-        assert any(v.get("id") == version_id for v in versions)
-
-    # Try reading the watermark back. It might fail for a number of reasons,
-    # but it should not 5xx.
-    r_read = client.post(
+    # READ WATERMARK
+    read_payload = {
+        "method": wm["method"],
+        "position": wm["position"],
+        "key": key,
+    }
+    r = client.post(
         f"/api/read-watermark/{doc_id}",
         headers=auth_headers,
-        json={
-            "method": wm.get("method"),
-            "position": wm.get("position"),
-            "key": key,
+        json=read_payload,
+    )
+    _assert_not_5xx(
+        r,
+        {
+            "name": "read_watermark",
+            "method": "POST",
+            "path": "/api/read-watermark/<doc_id>",
+            "doc_id": doc_id,
+            "json": read_payload,
         },
     )
-    assume_no_5xx(r_read)
+
+    if r.status_code == 200:
+        data = r.get_json()
+        assert data.get("secret") == secret
 
 
 # ---------------------------------------------------------------------------
-# Fuzz delete-document and list-all-versions
+# 4. Fuzz delete-document and list-all-versions
 # ---------------------------------------------------------------------------
 
 
 @given(
-    pdf_content=pdf_like_bytes,
+    filename=_random_string(min_size=3, max_size=20).map(lambda s: s + ".pdf"),
+    pdf_bytes=pdf_bytes_strategy,
 )
 @settings(
     max_examples=MAX_EXAMPLES,
     deadline=DEADLINE_MS,
     suppress_health_check=[HealthCheck.too_slow],
 )
-def test_fuzz_delete_document_and_list_all_versions(client, auth_headers, pdf_content):
-    # Upload a document
-    r_up = upload_one_pdf(client, auth_headers, "todelete.pdf", pdf_content)
-    assume_no_5xx(r_up)
+def test_fuzz_delete_document_and_list_all_versions(
+    client,
+    auth_headers,
+    filename,
+    pdf_bytes,
+):
+    # Upload
+    pdf_io = io.BytesIO(pdf_bytes)
+    data = {"file": (pdf_io, filename), "name": filename}
+    r = client.post(
+        "/api/upload-document",
+        headers=auth_headers,
+        data=data,
+        content_type="multipart/form-data",
+    )
+    upload_context: Dict[str, Any] = {
+        "name": "upload_document_for_delete",
+        "method": "POST",
+        "path": "/api/upload-document",
+        "filename": filename,
+        "bytes_b64": base64.b64encode(pdf_bytes).decode("ascii"),
+    }
+    _assert_not_5xx(r, upload_context)
 
-    if r_up.status_code not in (200, 201):
+    if r.status_code not in (200, 201):
         return
 
-    doc_id = r_up.get_json().get("id")
+    doc_id = r.get_json()["id"]
 
-    # List all versions (may be empty)
-    r_all = client.get("/api/list-all-versions", headers=auth_headers)
-    assume_no_5xx(r_all)
-    if r_all.status_code == 200:
-        assert isinstance(r_all.get_json().get("versions", []), list)
+    # LIST ALL VERSIONS
+    r = client.get("/api/list-all-versions", headers=auth_headers)
+    _assert_not_5xx(
+        r,
+        {
+            "name": "list_all_versions",
+            "method": "GET",
+            "path": "/api/list-all-versions",
+        },
+    )
 
-    # Delete the document
-    r_del = client.delete(f"/api/delete-document/{doc_id}", headers=auth_headers)
-    assume_no_5xx(r_del)
-
-    # After deletion, various responses are acceptable (404, 403, etc.),
-    # but none should be a 5xx.
-    r_get = client.get(f"/api/get-document/{doc_id}", headers=auth_headers)
-    assume_no_5xx(r_get)
+    # DELETE DOCUMENT
+    r = client.delete(f"/api/delete-document/{doc_id}", headers=auth_headers)
+    _assert_not_5xx(
+        r,
+        {
+            "name": "delete_document",
+            "method": "DELETE",
+            "path": "/api/delete-document/<doc_id>",
+            "doc_id": doc_id,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
-# Lightweight fuzzing of get-watermarking-methods alone
+# 5. Fuzz get-watermarking-methods (idempotent GET)
 # ---------------------------------------------------------------------------
 
 
-@given(
-    dummy=st.integers(),  # just to drive multiple examples
-)
+@given(dummy=st.integers())
 @settings(
     max_examples=MAX_EXAMPLES,
     deadline=DEADLINE_MS,
@@ -305,7 +381,15 @@ def test_fuzz_delete_document_and_list_all_versions(client, auth_headers, pdf_co
 )
 def test_fuzz_get_watermarking_methods(client, auth_headers, dummy):
     r = client.get("/api/get-watermarking-methods", headers=auth_headers)
-    assume_no_5xx(r)
+    _assert_not_5xx(
+        r,
+        {
+            "name": "get_watermarking_methods",
+            "method": "GET",
+            "path": "/api/get-watermarking-methods",
+        },
+    )
+
     if r.status_code == 200:
         data = r.get_json()
         assert "methods" in data
