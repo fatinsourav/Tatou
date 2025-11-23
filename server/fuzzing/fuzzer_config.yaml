@@ -1,134 +1,88 @@
 # ==========================================================
-# Tatou API Fuzzing Configuration
+# Tatou Fuzzing Configuration
+# Used by: test_fuzz_api.py
 # ==========================================================
 
-fuzzer: hypothesis
-version: 1.0
+global:
+  iterations: 20              # Number of mutations per request
+  max_payload_size: 4096      # Max mutation size for fuzzed fields
+  enabled: true               # Master switch for fuzzing
 
-description: |
-  Property-based fuzzing for Tatou's API.
-  This configuration enumerates the endpoints to fuzz, input strategies,
-  and global fuzzing limits. RMAP endpoints are intentionally excluded.
+auth:
+  # User creation fuzzing
+  create_user_fields:
+    - field: "email"
+      type: "string"
+      mutate: true
+    - field: "login"
+      type: "string"
+      mutate: true
+    - field: "password"
+      type: "string"
+      mutate: true
 
-global_settings:
-  max_examples: 30        # per test; increase to 200+ for long campaigns
-  deadline: null          # disable per-example timeouts
-  suppress_health_checks:
-    - function_scoped_fixture
+routes:
+  - name: "upload_document"
+    method: "POST"
+    path: "/api/upload-document"
+    fields:
+      - name: "file"
+        type: "pdf_bytes"
+        mutate: true
+      - name: "name"
+        type: "string"
+        mutate: true
 
-excluded_endpoints:
-  - "/api/rmap/*"
+  - name: "list_versions"
+    method: "GET"
+    path: "/api/list-versions"
+    query_params:
+      - "document_id"
 
-# ==========================================================
-# Endpoint-level fuzzing settings
-# ==========================================================
-endpoints:
+  - name: "get_document"
+    method: "GET"
+    path: "/api/get-document"
+    query_params:
+      - "document_id"
 
-  - path: "/api/status"
-    method: GET
-    strategy: 
-      query:
-        key: ascii_text
-        value: ascii_text
-    properties:
-      - "never_500"
-      - "json_or_empty"
+  - name: "delete_document"
+    method: "DELETE"
+    path: "/api/delete-document"
+    query_params:
+      - "document_id"
 
-  - path: "/api/create-user"
-    method: POST
-    strategy:
-      json:
-        login: safe_login
-        email: safe_email
-        password: ascii_text
-    properties:
-      - "never_500"
-      - "json_response"
+  - name: "create_watermark"
+    method: "POST"
+    path: "/api/create-watermark"
+    fields:
+      - name: "document_id"
+        type: "string"
+        mutate: true
+      - name: "method"
+        type: "string"
+        mutate: false
+      - name: "secret"
+        type: "string"
+        mutate: true
+      - name: "key"
+        type: "string"
+        mutate: true
 
-  - path: "/api/login"
-    method: POST
-    strategy:
-      json:
-        email: email_or_garbage
-        password: ascii_text
-    properties:
-      - "never_500"
+  - name: "read_watermark"
+    method: "POST"
+    path: "/api/read-watermark"
+    fields:
+      - name: "document_id"
+        type: "string"
+        mutate: true
+      - name: "method"
+        type: "string"
+        mutate: false
+      - name: "key"
+        type: "string"
+        mutate: true
 
-  - path: "/api/upload-document"
-    method: POST
-    strategy:
-      multipart:
-        filename: safe_login + ".pdf"
-        payload: 
-          - tiny_valid_pdf
-          - random_binary_0_4kb
-    properties:
-      - "never_500"
-      - "no_crash_on_invalid_pdf"
-
-  - path: "/api/list-documents"
-    method: GET
-    strategy:
-      query:
-        page: int_minus5_to_50
-        q: ascii_text
-    properties:
-      - "never_500"
-
-  - path: "/api/get-document/{id}"
-    method: GET
-    strategy:
-      headers:
-        Accept: ascii_text
-    properties:
-      - "never_500"
-
-  - path: "/api/delete-document/{id}"
-    method: DELETE
-    strategy:
-      none: true
-    properties:
-      - "never_500"
-
-  - path: "/api/list-versions/{id}"
-    method: GET
-    strategy:
-      query:
-        extra: ascii_text
-    properties:
-      - "never_500"
-
-  - path: "/api/list-all-versions"
-    method: GET
-    strategy:
-      query:
-        extra: ascii_text
-    properties:
-      - "never_500"
-
-  - path: "/api/get-watermarking-methods"
-    method: GET
-    properties:
-      - "never_500"
-
-  - path: "/api/create-watermark/{id}"
-    method: POST
-    strategy:
-      json:
-        method: valid_method_from_api
-        key: ascii_text
-        secret: ascii_text
-        position: null
-        intended_for: email
-    properties:
-      - "never_500"
-
-  - path: "/api/read-watermark/{id}"
-    method: POST
-    strategy:
-      json:
-        method: valid_method_from_api
-        key: ascii_text
-        position: null
-    properties:
-      - "never_500"
+  - name: "watermark_methods"
+    method: "GET"
+    path: "/api/watermarking-methods"
+    fields: []
