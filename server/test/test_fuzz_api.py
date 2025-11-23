@@ -10,13 +10,20 @@ import pytest
 from hypothesis import HealthCheck, given, settings, strategies as st
 import yaml
 
-from fuzzing.regression_helpers import record_failure  # new helper
+# Ensure project root (where `fuzzing/` lives) is on sys.path
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parent.parent  # /home/lab/Tatou/server
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from fuzzing.regression_helpers import record_failure  # now importable
 
 # ---------------------------------------------------------------------------
 # Load fuzzer configuration
 # ---------------------------------------------------------------------------
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "fuzzing" / "fuzzer_config.yaml"
+CONFIG_PATH = ROOT_DIR / "fuzzing" / "fuzzer_config.yaml"
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     FUZZER_CONFIG = yaml.safe_load(f)
